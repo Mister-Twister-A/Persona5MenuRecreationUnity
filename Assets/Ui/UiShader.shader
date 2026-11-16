@@ -1,26 +1,31 @@
-
-Shader "Custom/UiShader"
+Shader "UI/MaskedImage"
 {
     Properties
     {
-        [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
+        [PerRendererData] _MainTex ("Sprite", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
-        _MaskTex ("Mask Texture", 2D) = "white" {}
 
-        _StencilComp ("Stencil Comparison", Float) = 8
-        _Stencil ("Stencil ID", Float) = 0
-        _StencilOp ("Stencil Operation", Float) = 0
-        _StencilWriteMask ("Stencil Write Mask", Float) = 255
-        _StencilReadMask ("Stencil Read Mask", Float) = 255
-        _ColorMask ("Color Mask", Float) = 15
+        [Header(Mask)]
+        [Toggle] _MaskInvert ("Invert Mask", Float) = 0
+
+        [HideInInspector] _StencilComp ("Stencil Comparison", Float) = 8
+        [HideInInspector] _Stencil ("Stencil ID", Float) = 0
+        [HideInInspector] _StencilOp ("Stencil Operation", Float) = 0
+        [HideInInspector] _StencilWriteMask ("Stencil Write Mask", Float) = 255
+        [HideInInspector] _StencilReadMask ("Stencil Read Mask", Float) = 255
+        [HideInInspector] _ColorMask ("Color Mask", Float) = 15
     }
 
     SubShader
     {
         Tags
         {
-            "RenderType"="Transparent"
-            "Queue"="Transparent"
+            "RenderPipeline" = "UniversalPipeline"
+            "Queue" = "Transparent"
+            "RenderType" = "Transparent"
+            "IgnoreProjector" = "True"
+            "PreviewType" = "Plane"
+            "CanUseSpriteAtlas" = "True"
         }
 
         Stencil
@@ -32,68 +37,71 @@ Shader "Custom/UiShader"
             WriteMask [_StencilWriteMask]
         }
 
+        Cull Off
+        Lighting Off
+        ZWrite Off
+        ZTest [unity_GUIZTestMode]
+        Blend SrcAlpha OneMinusSrcAlpha
         ColorMask [_ColorMask]
 
         Pass
         {
-            Blend SrcAlpha OneMinusSrcAlpha
-            Cull Off
-            ZWrite Off
+           HLSLPROGRAM
+           #pragma vertex vert
+           #pragma fragment frag
 
-            HLSLPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
+           #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            #include "UnityCG.cginc"
+           TEXTURE2D(_MainTex);
+           SAMPLER(sampler_MainTex);
+
+           CBUFFER_START(UnityPerMaterial)
+                float4 _MainTex_ST;
+                float4 _Color;
+                float  _MaskInvert;
+
+                float4x4 _MaskCanvasToLocal;   
+                float2   _MaskCenter;
+                float2   _MaskHalfSize;
+            CBUFFER_END
 
             struct appdata
             {
-                float4 vertex : POSITION;
+                float4 positionOS : POSITION;   
+                float4 color : COLOR;
                 float2 uv : TEXCOORD0;
             };
 
             struct v2f
             {
-                float4 pos : SV_POSITION;
-                float3 worldPos : TEXCOORD0;
+                float4 positionCS : SV_POSITION;
+                float4 color : COLOR;
+                float2 uv : TEXCOORD0;
+                float2 canvasPos : TEXCOORD1;
             };
-
-            sampler2D _MainTex;
-            sampler2D _MaskTex;
-
-            fixed4 _Color;
-            float4x4 _MaskWorldToLocal;
 
             v2f vert(appdata v)
             {
                 v2f o = (v2f)0;
-
-                o.pos = UnityObjectToClipPos(v.vertex);
-                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
-
+                o.positionCS = TransformObjectToHClip(v.positionOS.xyz);
+                o.canvasPos  = v.positionOS.xy;
+                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                o.color = v.color * _Color;
                 return o;
             }
 
-            fixed4 frag(v2f i) : SV_Target
+            float4 frag(v2f i) : SV_Target
             {
-                float3 maskLocalPos = mul(_MaskWorldToLocal,float4(i.worldPos, 1.0)).xyz;
+                float2 m = mul(_MaskCanvasToLocal, float4(i.canvasPos, 0.0, 1.0)).xy - _MaskCenter;
+                float2 q = m / max(_MaskHalfSize, 1e-5);
 
-                float2 maskUV = maskLocalPos.xy + 0.5;
+                bool inside = max(abs(q.x), abs(q.y)) <= 1.0;
 
-                if (maskUV.x < 0.0 || maskUV.x > 1.0 ||
-                    maskUV.y < 0.0 || maskUV.y > 1.0)
-                {
-                    discard;
-                }
+                if (_MaskInvert > 0.5) inside = !inside;
+                clip(inside ? 1.0 : -1.0);
 
-                fixed4 col = tex2D(_MainTex, maskUV) * _Color;
-
-                fixed maskAlpha = tex2D(_MaskTex, maskUV).a;
-                col.a *= maskAlpha;
-
-                return col;
+                return SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv) * i.color;
             }
-
             ENDHLSL
         }
     }
