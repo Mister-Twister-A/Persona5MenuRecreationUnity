@@ -19,6 +19,9 @@ Shader "CustomRenderTexture/Test1Transperent"
         }
         Pass
         {
+            Tags{
+                "LightMode" = "SRPDefaultUnLit"
+            }
             Blend [_SrcBlend] [_DstBlend]
             HLSLPROGRAM
 
@@ -62,5 +65,81 @@ Shader "CustomRenderTexture/Test1Transperent"
             
             ENDHLSL
         }
+        
+        Pass{
+            Tags{
+                "LightMode" = "DepthOnly"
+            }
+
+            ZWrite On 
+            ColorMask R 
+
+            HLSLPROGRAM
+            #pragma vertex depthOnlyVert
+            #pragma fragment depthOnlyFrag
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            struct appdata{
+                float4 positionOS : POSITION;
+            };
+
+            struct v2f {
+                float4 positionCS : SV_POSITION;
+            };
+
+            v2f depthOnlyVert(appdata v){
+                v2f o = (v2f)0;
+
+                o.positionCS = TransformObjectToHClip(v.positionOS.xyz);
+
+                return o;
+            }
+
+            float depthOnlyFrag(v2f v): SV_TARGET{
+                return v.positionCS.z;
+            }
+            ENDHLSL
+
+        }
+
+        Pass{
+            Tags{
+                "LightMode" = "DepthNormals"
+            }
+            ZWrite On
+            HLSLPROGRAM
+            #pragma vertex depthNormalVertex
+            #pragma fragment depthNormalFragment
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            
+
+            struct appdata{
+                float4 positionOS : POSITION;
+                float3 normal : NORMAL;
+            };
+
+            struct v2f {
+                float4 positionCS : SV_POSITION;
+                float3 normalWS : TEXCOORD0;
+            };
+
+            v2f depthNormalVertex(appdata v){
+                v2f o = (v2f)0;
+
+                o.positionCS = TransformObjectToHClip(v.positionOS.xyz);
+                float3 normalWS = TransformObjectToWorldNormal(v.normal);
+                o.normalWS = NormalizeNormalPerVertex(normalWS);
+                return o;
+            }
+
+            float4 depthNormalFragment(v2f v) : SV_TARGET{
+                float3 normalWS = NormalizeNormalPerPixel(v.normalWS);
+
+                return float4 (normalWS, 0.0f);
+            }
+            ENDHLSL
+        }
     }
+
 }
