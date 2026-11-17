@@ -1,10 +1,11 @@
-Shader "CustomRenderTexture/Test1Transperent"
+Shader "CustomRenderTexture/Waves"
 {
     Properties
     {
         _Color ("Color", Color) = (1,1,1,1)
         _MainTex("InputTex", 2D) = "white" {}
-        _ScrollSpeed("Scroll speed", Vector) = (0,0,0,0)
+        _WaveHeight("Height of the wave", Range(0.0, 1.0)) = 0.25
+        _WaveSpeed("Speed of the wave", Range(0.0, 10.0)) = 3.0
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend("Source blend mode", Integer) = 5
         [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend("destination blend mode", Integer) = 10
      }
@@ -34,6 +35,8 @@ Shader "CustomRenderTexture/Test1Transperent"
                 float4 _Color;
                 float4 _MainTex_ST;
                 float2 _ScrollSpeed;
+                float _WaveHeight;
+                float _WaveSpeed;
             CBUFFER_END
 
             TEXTURE2D(_MainTex);
@@ -52,14 +55,18 @@ Shader "CustomRenderTexture/Test1Transperent"
             v2f vert(appdata a){
                 v2f o = (v2f)0;
 
-                o.positionCS = TransformObjectToHClip(a.positionOS.xyz);
+                float3 positionWS = TransformObjectToWorld(a.positionOS.xyz);
+                float waveHeight = sin(positionWS.x + positionWS.z + _Time.y * _WaveSpeed) * _WaveHeight;
+                float3 newPositionWS = float3(positionWS.x, positionWS.y + waveHeight, positionWS.z);
+
+                o.positionCS = TransformWorldToHClip(newPositionWS);
                 o.uv = TRANSFORM_TEX(a.uv, _MainTex);
                 return o;
             }
 
             float4 frag(v2f v) : SV_TARGET{
-                float2 uv = v.uv + _ScrollSpeed * _Time.y;
-                float4 textureColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
+                //float2 uv = v.uv + _ScrollSpeed * _Time.y;
+                float4 textureColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, v.uv);
                 return _Color * textureColor;
             }
             
