@@ -7,6 +7,9 @@ Shader "UI/MaskedImage"
 
         [Header(Mask)]
         [Toggle] _MaskInvert ("Invert Mask", Float) = 0
+        [Toggle] _OutsideDiscard ("Discard Outside", Float) = 0
+        _OutsideColor ("Outside Tint", Color) = (1, 0.35, 0.35, 1)
+        _OutsideAmount ("Outside Tint Amount", Range(0, 1)) = 0.5
 
         [HideInInspector] _StencilComp ("Stencil Comparison", Float) = 8
         [HideInInspector] _Stencil ("Stencil ID", Float) = 0
@@ -59,6 +62,9 @@ Shader "UI/MaskedImage"
                 float4 _MainTex_ST;
                 float4 _Color;
                 float  _MaskInvert;
+                float  _OutsideDiscard;
+                float4 _OutsideColor;
+                float  _OutsideAmount;
 
                 float4x4 _MaskCanvasToLocal;   
                 float2   _MaskCenter;
@@ -97,10 +103,16 @@ Shader "UI/MaskedImage"
 
                 bool inside = max(abs(q.x), abs(q.y)) <= 1.0;
 
-                if (_MaskInvert > 0.5) inside = !inside;
-                clip(inside ? 1.0 : -1.0);
+                inside = lerp(inside, 1.0 - inside, _MaskInvert);
+                float outside = 1.0 - inside;
+                clip(1.0 - outside * _OutsideDiscard * 2.0);
 
-                return SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv) * i.color;
+                float4 col = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv) * i.color;
+
+                float tintAmount = _OutsideAmount * outside * (1.0 - _OutsideDiscard);
+                col.rgb = lerp(col.rgb, col.rgb * _OutsideColor.rgb, tintAmount);
+
+                return col;
             }
             ENDHLSL
         }
