@@ -3,19 +3,28 @@ using UnityEngine;
 
 public class UIPolygonMove : MonoBehaviour
 {
+    public int randomOffestNum = 15;
+    public float duration = 0.2f;
+
+    Vector2[] basePos;
+
     void Start()
     {
-        foreach (RectTransform child in transform)
-        {
-            StartCoroutine(UpdateChildPos(child));
-        }
+        Rebase();
+        for (int i = 0; i < transform.childCount; i++)
+            StartCoroutine(UpdateChildPos((RectTransform)transform.GetChild(i), i));
     }
-    IEnumerator UpdateChildPos(RectTransform child)
+    public void Rebase()
     {
-        Vector2 prePos = child.anchoredPosition;
-        Vector2 fromPos = prePos;
-        Vector2 targetPos = prePos + RandomOffset(30);
-        float duration = 0.2f;
+        basePos = new Vector2[transform.childCount];
+        for (int i = 0; i < basePos.Length; i++)
+            basePos[i] = ((RectTransform)transform.GetChild(i)).anchoredPosition;
+    }
+
+    IEnumerator UpdateChildPos(RectTransform child, int index)
+    {
+        Vector2 fromPos = basePos[index];
+        Vector2 targetPos = basePos[index] + RandomOffset(randomOffestNum);
         float pastTime = 0;
         while (true)
         {
@@ -23,16 +32,14 @@ public class UIPolygonMove : MonoBehaviour
             if (pastTime >= duration)
             {
                 fromPos = targetPos;
-                targetPos = prePos + RandomOffset(30);
+                targetPos = basePos[index] + RandomOffset(randomOffestNum);
                 pastTime = 0;
             }
-            var t = pastTime / duration;
-            child.anchoredPosition = Vector2.Lerp(fromPos, targetPos, t);
+            child.anchoredPosition = Vector2.Lerp(fromPos, targetPos, pastTime / duration);
             yield return null;
         }
     }
-    private Vector2 RandomOffset(float max)
-    {
-        return new Vector2(Random.Range(-max, max), Random.Range(-max, max));
-    }
+
+    Vector2 RandomOffset(float max) =>
+        new Vector2(Random.Range(-max, max), Random.Range(-max, max));
 }
