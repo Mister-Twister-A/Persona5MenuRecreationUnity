@@ -12,11 +12,10 @@ public class UiBindings : MonoBehaviour
 
     void Update()
     {
-        if (!Input.GetKeyDown(KeyCode.E)) return;
-
-        if (director.state == PlayState.Playing && !restartIfPlaying) return;
-
-        director.time = 0;
-        director.Play();
+        if (Input.GetKeyDown(KeyCode.E)){
+            if (director.state == PlayState.Playing && !restartIfPlaying) return;
+            director.time = 0;
+            director.Play();
+        }
     }
 }

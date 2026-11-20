@@ -8,7 +8,7 @@ public class UIPolygonMove : MonoBehaviour
 
     Vector2[] basePos;
 
-    void Start()
+    void OnEnable()
     {
         Rebase();
         for (int i = 0; i < transform.childCount; i++)
