@@ -6,6 +6,7 @@ using UnityEngine.Playables;
 
 public class UIController : MonoBehaviour
 {
+    public enum Screen {Main, Skill, Item}
     [SerializeField] private List<GameObject> Buttons = new List<GameObject>();
 
     [SerializeField] private List<string> buttonDesc = new List<string>();
@@ -23,11 +24,18 @@ public class UIController : MonoBehaviour
     [SerializeField] private TMP_Text buttonNum;
     [SerializeField] private TMP_Text buttonDesc_txt;
 
+    [Header("Item screen")]
+
+    [SerializeField] private List<GameObject> Items = new List<GameObject>();
+    private RectTransform curItemRect;
+    [SerializeField] private int curItemID = 0;
+
     [Header("Playable directors")]
     public PlayableDirector director_skill;
+    public PlayableDirector director_item;
     public bool restartIfPlaying = true;
 
-    [SerializeField] private string curScreen = "main";
+    [SerializeField] private Screen curScreen = Screen.Main;
 
     void Awake()
     {
@@ -43,6 +51,16 @@ public class UIController : MonoBehaviour
         buttonNum.text = $"{id + 1}";
         buttonDesc_txt.text = buttonDesc[id];
     }
+
+    private void ChangeCurItem(int id)
+    {
+  
+        curItemRect = Items[id].GetComponent<RectTransform>();
+        Encapsulate(redSelector, curItemRect,0f,true);
+        //Encapsulate(blueSelector, curButtonRect,0f,true);
+        //buttonNum.text = $"{id + 1}";
+        buttonDesc_txt.text = "What item would you like to Use?";
+    }
     // private void ChangeCurChar(int id)
     // {
     //     curChar = Characters[id];
@@ -55,8 +73,10 @@ public class UIController : MonoBehaviour
 
     void Update()
     {
-        if (curScreen == "main") UpdateMain();
-        if (curScreen == "skill") UpdateSkill();
+        if (curScreen == Screen.Main) UpdateMain();
+        if (curScreen == Screen.Skill) UpdateSkill();
+        if(curScreen == Screen.Item) UpdateItem();
+
     }
 
     void UpdateMain()
@@ -79,11 +99,21 @@ public class UIController : MonoBehaviour
         {
             if (curButtonID == 0)
             {
-                curScreen = "skill";
+                curScreen = Screen.Skill;
                 //Debug.Log(director_skill.state);
                 if (director_skill.state == PlayState.Playing && !restartIfPlaying) return;
                 director_skill.time = 0;
                 director_skill.Play();
+            }
+
+            if (curButtonID == 1)
+            {
+                curScreen = Screen.Item;
+                if (director_item.state == PlayState.Playing && !restartIfPlaying) return;
+                director_item.time = 0;
+                director_item.Play();
+                StartCoroutine(WaitForDirectorEnd(director_item, 0.2f));
+                //director_item.stopped -= StartOnlyRedSelector;
             }
         }
     }
@@ -97,6 +127,35 @@ public class UIController : MonoBehaviour
             
         }
 
+    }
+    IEnumerator WaitForDirectorEnd(PlayableDirector d, float t)
+    {
+        yield return null; 
+        while (d.time < d.duration - t) yield return null;
+        ChangeCurItem(0);
+    }
+
+    void UpdateItem()
+    {
+        if (Input.GetKeyDown(KeyCode.DownArrow))
+        {
+            curItemID+=1;
+            if (curItemID == Items.Count) curItemID = 0;
+            ChangeCurItem(curItemID);
+        }
+        if (Input.GetKeyDown(KeyCode.UpArrow))
+        {
+            curItemID-=1;
+            if (curItemID == -1) curItemID =  Items.Count - 1;
+            ChangeCurItem(curItemID);
+        }
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            
+            StartCoroutine(Reverse(director_item));
+            
+        }
     }
 
     IEnumerator Reverse(PlayableDirector director)
@@ -116,8 +175,8 @@ public class UIController : MonoBehaviour
         director.Evaluate();
 
         director.timeUpdateMode = DirectorUpdateMode.GameTime;
-        ChangeCurButton(0);
-        curScreen = "main";
+        ChangeCurButton(curButtonID);
+        curScreen = Screen.Main;
     }
 
 
